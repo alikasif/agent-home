@@ -233,14 +233,15 @@ def test_heavily_used_small_agent_is_keep(tmp_path: Path) -> None:
     assert stat(build_stats(sessions, [item], RATES), "alpha").verdict == "keep"
 
 
-def test_agents_md_not_loaded_reason_mentions_on_demand_pointer(tmp_path: Path) -> None:
+def test_agents_md_not_loaded_reason_is_true_in_any_repo(tmp_path: Path) -> None:
     item = always_on("agents_md", "AGENTS.md", 4000)
     sessions = [build(tmp_path, f"s{i}") for i in range(MIN_SESSIONS + 1)]
     result = stat(build_stats(sessions, [item], RATES), "AGENTS.md")
     assert result.verdict == "insufficient data"
-    assert "not auto-loaded" in result.reason
-    assert "CLAUDE.md" in result.reason
-    assert "on demand" in result.reason
+    assert result.reason.startswith("not loaded in any scanned session")
+    assert "when CLAUDE.md only points to it" in result.reason
+    assert "read on demand" in result.reason
+    assert "here" not in result.reason
 
 
 # -- invocations --------------------------------------------------------------

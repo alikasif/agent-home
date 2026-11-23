@@ -239,3 +239,37 @@ def test_token_columns_are_labelled_estimated_not_recorded() -> None:
     text = render([make_stat()])
     assert "Token columns are estimated sizes (recorded chars / 4.0)" in text
     assert "recorded sizes" not in text
+
+
+def test_footer_says_cache_misses_are_not_counted() -> None:
+    text = render([make_stat()])
+    assert (
+        "Dollar figures assume the cache stays warm; cache misses are not "
+        "counted, so they are understated."
+    ) in text
+
+
+def test_footer_says_figures_are_not_from_billing_totals() -> None:
+    text = render([make_stat()])
+    assert "not derived from billing totals" in text
+    assert "4.0 chars per token and list prices" in text
+    assert "split" not in text
+
+
+def test_footer_says_on_use_covers_dispatch_only() -> None:
+    text = render([make_stat()])
+    assert (
+        "On-use dollars cover the dispatch only, not the calls the subagent "
+        "makes, so they are understated for agents that run long."
+    ) in text
+
+
+def test_footer_says_deferred_mcp_tools_are_understated() -> None:
+    text = render([make_stat()])
+    assert "Deferred MCP tools are not in the recorded request shape" in text
+    assert "MCP/plugin tokens are understated" in text
+
+
+def test_footer_is_ascii() -> None:
+    footer = render([make_stat()]).split("Verdict rules")[0]
+    assert footer.isascii()

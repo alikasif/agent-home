@@ -17,6 +17,10 @@ line-length = 88
 # Only lint the context-audit skill; other skills' scripts predate these checks.
 include = [".claude/skills/context-audit/**/*.py", "pyproject.toml"]
 
+[tool.ruff.lint]
+# Enforce line-length too; extend-select keeps the default rules.
+extend-select = ["E501"]
+
 [tool.pyrefly]
 project-includes = [".claude/skills/context-audit/**/*.py"]
 # The default excludes skip hidden directories such as .claude.

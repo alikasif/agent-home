@@ -261,8 +261,8 @@ def decide_verdict(
             return (
                 "insufficient data",
                 (
-                    "not auto-loaded here (CLAUDE.md only points to it); "
-                    "it is read on demand via that pointer, so no session loaded it"
+                    "not loaded in any scanned session (it is not auto-loaded "
+                    "when CLAUDE.md only points to it; it is read on demand)"
                 ),
             )
         return "insufficient data", "no scanned session loaded it"
@@ -282,7 +282,10 @@ def decide_verdict(
             )
         return (
             "keep",
-            f"{always_tokens} tokens paid every session, within {TRIM_ALWAYS_ON_TOKENS}",
+            (
+                f"{always_tokens} tokens paid every session, "
+                f"within {TRIM_ALWAYS_ON_TOKENS}"
+            ),
         )
     rate = used / loaded
     large = always_tokens > TRIM_DESCRIPTION_TOKENS
@@ -629,8 +632,29 @@ def _footer() -> list[str]:
         "n/a means an unpriced model or never loaded. Token columns are "
         f"estimated sizes (recorded chars / {CHARS_PER_TOKEN})."
     )
+    basis = (
+        f"All figures are estimated from recorded chars at {CHARS_PER_TOKEN} "
+        "chars per token and list prices; not derived from billing totals."
+    )
+    cache = (
+        "Dollar figures assume the cache stays warm; cache misses are not "
+        "counted, so they are understated."
+    )
+    dispatch = (
+        "On-use dollars cover the dispatch only, not the calls the subagent "
+        "makes, so they are understated for agents that run long."
+    )
     schemas = (
         "Tool input schemas are excluded from the Not ours figures (the "
-        "transcript's request shape omits them), so tool tokens are understated."
+        "transcript's request shape omits them), so tool tokens are understated. "
+        "Deferred MCP tools are not in the recorded request shape, so "
+        "MCP/plugin tokens are understated (the figure can read about 1)."
     )
-    return [dollars, f"Verdict rules (heuristic): {constants}", schemas]
+    return [
+        dollars,
+        basis,
+        cache,
+        dispatch,
+        f"Verdict rules (heuristic): {constants}",
+        schemas,
+    ]
