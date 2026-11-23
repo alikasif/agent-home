@@ -1,0 +1,35 @@
+[project]
+name = "agent-home"
+version = "0.1.0"
+description = "Shared agents, skills, rules and standards"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = [".claude/skills/context-audit/scripts"]
+testpaths = [".claude/skills/context-audit/tests"]
+
+[tool.ruff]
+line-length = 88
+# Only lint the context-audit skill; other skills' scripts predate these checks.
+include = [".claude/skills/context-audit/**/*.py", "pyproject.toml"]
+
+[tool.pyrefly]
+project-includes = [".claude/skills/context-audit/**/*.py"]
+# The default excludes skip hidden directories such as .claude.
+project-excludes = ["**/__pycache__/**", "**/.venv/**"]
+disable-project-excludes-heuristics = true
+search-path = [
+    ".claude/skills/context-audit/scripts",
+    ".claude/skills/context-audit/tests",
+]
+
+[dependency-groups]
+dev = [
+    "pyrefly>=1.5.0",
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
+]
