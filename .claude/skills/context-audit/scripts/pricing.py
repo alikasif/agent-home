@@ -17,12 +17,17 @@ TOKENS_PER_MTOK = 1_000_000
 
 @dataclass(frozen=True)
 class Rates:
-    """USD per million tokens for one model."""
+    """USD per million tokens for one model.
+
+    ``cache_write`` is the 5-minute cache write rate, ``cache_write_1h`` the
+    1-hour one.
+    """
 
     input: float
     cache_write: float
     cache_read: float
     output: float
+    cache_write_1h: float
 
 
 @dataclass(frozen=True)
@@ -40,17 +45,19 @@ class Money:
 # deliberately absent: its price depends on prompt length (over 100k tokens), which
 # ``Rates`` cannot express.
 #
-# Known gap: ``Usage.cache_write`` is a single figure, so the 5-minute cache write
-# rate (1.25x input) is used. Writes into the 1-hour cache cost 2x input. In local
-# transcripts nearly all writes are 1-hour, so an estimate here runs roughly a third
-# below the recorded cost; repricing one such session's writes at the 1-hour rate
-# reproduces its recorded cost exactly. Fixing it needs the 5m/1h split added to
-# ``Usage`` (transcript field ``cache_creation.ephemeral_*_input_tokens``).
+# Cache writes: ``Usage.cache_write`` is the total and ``Usage.cache_write_1h`` the
+# part written to the 1-hour cache; the rest is priced at the 5-minute rate.
+
 RATES: dict[str, Rates] = {
-    "claude-sonnet-5-5": Rates(
-        input=2.0, cache_write=2.5, cache_read=0.10, output=10.0
+    "claude-opus-5-5": Rates(
+        input=4.0, cache_write=5.0, cache_read=0.20, output=20.0, cache_write_1h=8.0
     ),
-    "claude-sonnet-5": Rates(input=2.0, cache_write=2.5, cache_read=0.20, output=10.0),
+    "claude-sonnet-5-5": Rates(
+        input=2.0, cache_write=2.5, cache_read=0.10, output=10.0, cache_write_1h=4.0
+    ),
+    "claude-sonnet-5": Rates(
+        input=2.0, cache_write=2.5, cache_read=0.20, output=10.0, cache_write_1h=4.0
+    ),
 }
 
 
@@ -68,7 +75,8 @@ def usage_cost(
         return None
     total = (
         price_tokens(usage.input, rate.input)
-        + price_tokens(usage.cache_write, rate.cache_write)
+        + price_tokens(usage.cache_write - usage.cache_write_1h, rate.cache_write)
+        + price_tokens(usage.cache_write_1h, rate.cache_write_1h)
         + price_tokens(usage.cache_read, rate.cache_read)
         + price_tokens(usage.output, rate.output)
     )
@@ -77,6 +85,10 @@ def usage_cost(
 
 def session_cost(session: Session, rates: dict[str, Rates] = RATES) -> Money | None:
     """Return the recorded session cost, else an estimate, else ``None``.
+
+    The recorded figure is session-level (it can include resumed history and
+    calls made outside this file), so use call-level :func:`usage_cost` for
+    per-artifact dollars and this only for session totals.
 
     The estimate is ``None`` when the session has no calls or any call's model
     has no rate, so a partial sum is never presented as the total.

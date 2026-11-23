@@ -7,7 +7,9 @@ from pricing import Money, Rates, price_tokens, session_cost, usage_cost
 from transcripts import Call, Session, Usage
 
 MILLION = 1_000_000
-TEST_RATES = {"m": Rates(input=1, cache_write=2, cache_read=0.5, output=4)}
+TEST_RATES = {
+    "m": Rates(input=1, cache_write=2, cache_read=0.5, output=4, cache_write_1h=3)
+}
 
 
 def make_session(calls: list[Call], cost_usd: float | None) -> Session:
@@ -34,6 +36,15 @@ def make_call(model: str, usage: Usage) -> Call:
 def test_usage_cost_applies_each_rate() -> None:
     usage = Usage(MILLION, MILLION, MILLION, MILLION)
     assert usage_cost(usage, "m", TEST_RATES) == Money(7.5, measured=False)
+
+
+def test_usage_cost_prices_one_hour_writes_at_their_own_rate() -> None:
+    # 1M cache-write tokens, 400k of them 1-hour: 600k x $2 + 400k x $3 = $2.40.
+    usage = Usage(0, MILLION, 0, 0, cache_write_1h=400_000)
+    cost = usage_cost(usage, "m", TEST_RATES)
+    assert cost is not None
+    assert cost.value == pytest.approx(2.4)
+    assert cost.measured is False
 
 
 def test_unknown_model_returns_none() -> None:
@@ -71,4 +82,5 @@ def test_shipped_rates_are_ordered_sanely() -> None:
 
     assert RATES
     for rate in RATES.values():
-        assert 0 < rate.cache_read < rate.input < rate.cache_write < rate.output
+        assert 0 < rate.cache_read < rate.input < rate.cache_write < rate.cache_write_1h
+        assert rate.cache_write_1h < rate.output
