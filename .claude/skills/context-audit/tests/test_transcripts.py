@@ -323,3 +323,20 @@ def test_last_cost_state_wins_and_absent_means_none(tmp_path: Path) -> None:
     costs = {s.session_id: s.cost_usd for s in load_sessions(tmp_path)}
 
     assert costs == {"with": 2.5, "without": None}
+
+
+def test_usage_parses_one_hour_cache_write_split(tmp_path: Path) -> None:
+    builder = (
+        TranscriptBuilder()
+        .request()
+        .assistant(cache_write=100, cache_write_1h=60)
+        .request()
+        .assistant(cache_write=50)  # no cache_creation breakdown: all counts as 5m
+    )
+    builder.write(tmp_path / "proj-a" / "sess-1.jsonl")
+    session = load_one(tmp_path)
+
+    assert [(c.usage.cache_write, c.usage.cache_write_1h) for c in session.calls] == [
+        (100, 60),
+        (50, 0),
+    ]

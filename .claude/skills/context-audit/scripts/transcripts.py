@@ -77,12 +77,17 @@ class TranscriptFormatError(Exception):
 
 @dataclass(frozen=True)
 class Usage:
-    """Token counts reported for one API call."""
+    """Token counts reported for one API call.
+
+    ``cache_write`` is the total of cache-creation tokens; ``cache_write_1h`` is
+    the part of it written to the 1-hour cache (the rest is the 5-minute tier).
+    """
 
     input: int
     cache_write: int
     cache_read: int
     output: int
+    cache_write_1h: int = 0
 
 
 @dataclass(frozen=True)
@@ -366,11 +371,17 @@ def _new_call(
 def _parse_usage(raw: object) -> Usage | None:
     if not isinstance(raw, dict):
         return None
+    cache_write = _count(raw.get("cache_creation_input_tokens"))
+    breakdown = raw.get("cache_creation")
+    one_hour = _count(
+        breakdown.get("ephemeral_1h_input_tokens") if isinstance(breakdown, dict) else 0
+    )
     return Usage(
         input=_count(raw.get("input_tokens")),
-        cache_write=_count(raw.get("cache_creation_input_tokens")),
+        cache_write=cache_write,
         cache_read=_count(raw.get("cache_read_input_tokens")),
         output=_count(raw.get("output_tokens")),
+        cache_write_1h=min(one_hour, cache_write),
     )
 
 

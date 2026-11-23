@@ -35,7 +35,7 @@ class TranscriptBuilder:
         self._last_request_id: str | None = None
         self._last_message_id: str | None = None
         self._last_tool_id: str | None = None
-        self._last_usage: dict[str, int] = {}
+        self._last_usage: dict[str, Any] = {}
         self._last_model = DEFAULT_MODEL
 
     # -- low level ---------------------------------------------------------
@@ -109,11 +109,14 @@ class TranscriptBuilder:
         output: int = 5,
         entries: int = 1,
         model: str = DEFAULT_MODEL,
+        cache_write_1h: int | None = None,
     ) -> Self:
         """Emit one API call as ``entries`` assistant entries sharing a message id.
 
         Claude Code writes one assistant entry per content block, each carrying
         the same usage, so ``entries > 1`` exercises per-message de-duplication.
+        ``cache_write_1h`` (``None`` omits the field, as older versions do) is the
+        part of ``cache_write`` written to the 1-hour cache.
         """
         self._message_seq += 1
         self._last_message_id = f"msg-{self._message_seq}"
@@ -124,6 +127,11 @@ class TranscriptBuilder:
             "cache_read_input_tokens": cache_read,
             "output_tokens": output,
         }
+        if cache_write_1h is not None:
+            self._last_usage["cache_creation"] = {
+                "ephemeral_5m_input_tokens": cache_write - cache_write_1h,
+                "ephemeral_1h_input_tokens": cache_write_1h,
+            }
         for _ in range(entries):
             self._assistant_entry([{"type": "text", "text": "synthetic reply"}])
         return self
