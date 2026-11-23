@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from transcript_factory import TranscriptBuilder, standard_session
 from transcripts import (
+    TESTED_VERSIONS,
     Call,
     InstructionFile,
     Invocation,
@@ -340,3 +341,9 @@ def test_usage_parses_one_hour_cache_write_split(tmp_path: Path) -> None:
         (100, 60),
         (50, 0),
     ]
+
+
+def test_tested_versions_is_a_non_empty_tuple_of_strings() -> None:
+    assert TESTED_VERSIONS
+    assert isinstance(TESTED_VERSIONS, tuple)
+    assert all(isinstance(version, str) for version in TESTED_VERSIONS)

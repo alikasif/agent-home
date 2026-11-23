@@ -41,6 +41,9 @@ from typing import Any, Literal
 
 SYNTHETIC_MODEL = "<synthetic>"
 UNKNOWN_VERSION = "unknown"
+# Claude Code versions whose transcripts this parser was checked against. The
+# report warns when a scanned session came from a version not listed here.
+TESTED_VERSIONS: tuple[str, ...] = ("2.1.201", "2.1.325", "2.1.326", "2.1.330")
 HASH_LENGTH = 16
 # Fewer unparseable lines than this in a file with no JSON object is treated as a
 # live session cut mid-write; more means the format changed.

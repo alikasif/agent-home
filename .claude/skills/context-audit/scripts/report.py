@@ -1,7 +1,7 @@
 """Per-artifact statistics and verdicts for the context audit.
 
-This is the stats half of the report: it turns sessions plus the repo's
-artifacts into numbers and a verdict per artifact. Rendering is added separately.
+The first half turns sessions plus the repo's artifacts into numbers and a
+verdict per artifact; the second half renders them as a terminal report or JSON.
 
 Every dollar figure here is call-level and *estimated* (``measured=False``):
 it is computed from each call's own model rate, never from a session's recorded
@@ -14,11 +14,21 @@ Only names, sizes and counts are produced; no transcript or file content.
 
 from __future__ import annotations
 
+import json
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal
 
-from attribute import Artifact, Loaded, match_session, tokens_from_chars
+from attribute import (
+    CHARS_PER_TOKEN,
+    Artifact,
+    Loaded,
+    Unmatched,
+    match_session,
+    tokens_from_chars,
+)
 from pricing import RATES, Money, Rates, price_tokens
 from transcripts import Call, RequestShape, Session
 
@@ -362,3 +372,263 @@ def top_tool_results(sessions: list[Session], n: int) -> list[ToolResultStat]:
             seen.add(result.content_hash)
     ranked = sorted(totals.items(), key=lambda item: (-item[1][0], item[0]))
     return [ToolResultStat(name, *row) for name, row in ranked[:n]]
+
+
+# -- rendering ----------------------------------------------------------------
+
+NOT_AVAILABLE = "n/a"
+EMPTY_CELL = "-"
+UNMATCHED_LINES = 10
+HEADERS = ("always", "on-use", "used", "$ window", "$/session", "verdict")
+
+
+@dataclass(frozen=True)
+class ReportMeta:
+    """Facts about the scanned window that the report states but does not compute.
+
+    ``first_day`` and ``last_day`` are the dates of the earliest and latest call;
+    ``claude_versions`` are the Claude Code versions the sessions came from.
+    """
+
+    session_count: int
+    first_day: date
+    last_day: date
+    claude_versions: list[str]
+    tested_versions: tuple[str, ...]
+    skipped_lines: int
+    unmatched: list[Unmatched]
+
+
+def render_report(
+    stats: list[ArtifactStats],
+    other: OtherLoad,
+    results: list[ToolResultStat],
+    meta: ReportMeta,
+    top: int | None,
+) -> str:
+    """Return the terminal report: header, table, reasons, other context, footer.
+
+    Rows are ordered by estimated dollars in the window (unpriced last) and cut
+    to ``top`` when given. The output is ASCII only and holds names, sizes and
+    counts, never message, attachment or file content.
+    """
+    ranked = sorted(stats, key=_row_order)
+    shown = ranked if top is None else ranked[: max(top, 0)]
+    lines = [_header(meta), *_warnings(meta), ""]
+    lines += _table(shown)
+    if len(shown) < len(ranked):
+        lines.append(f"(showing top {len(shown)} of {len(ranked)} artifacts by $)")
+    lines += ["", *_reasons(shown), ""]
+    lines.append(_not_ours(other))
+    lines += _unmatched_lines(meta.unmatched)
+    lines += _result_lines(results)
+    lines += ["", *_footer()]
+    return "\n".join(lines) + "\n"
+
+
+def render_json(stats: list[ArtifactStats], meta: ReportMeta) -> str:
+    """Return the report as JSON: ``{"meta": {...}, "artifacts": [...]}``.
+
+    Each artifact entry has the keys ``artifact``, ``kind``, ``path``,
+    ``always_tokens``, ``on_use_tokens``, ``loaded_sessions``, ``used_sessions``,
+    ``cost_window``, ``cost_per_session`` (dollars, or ``null`` when unpriced or
+    never loaded), ``verdict``, ``reason`` and ``measured`` (whether the dollar
+    figures were recorded rather than estimated).
+    """
+    payload = {
+        "meta": {
+            "session_count": meta.session_count,
+            "first_day": meta.first_day.isoformat(),
+            "last_day": meta.last_day.isoformat(),
+            "claude_versions": meta.claude_versions,
+            "tested_versions": list(meta.tested_versions),
+            "untested_versions": _untested(meta),
+            "skipped_lines": meta.skipped_lines,
+            "unmatched": [
+                {"source": item.source, "chars": item.chars} for item in meta.unmatched
+            ],
+        },
+        "artifacts": [_json_row(item) for item in stats],
+    }
+    return json.dumps(payload, indent=2)
+
+
+def _json_row(item: ArtifactStats) -> dict[str, object]:
+    return {
+        "artifact": item.artifact.name,
+        "kind": item.artifact.kind,
+        "path": item.artifact.path.as_posix(),
+        "always_tokens": item.always_tokens,
+        "on_use_tokens": item.on_use_tokens,
+        "loaded_sessions": item.loaded_sessions,
+        "used_sessions": item.used_sessions,
+        "cost_window": _dollars(item, item.cost_window),
+        "cost_per_session": _dollars(item, item.cost_per_session),
+        "verdict": item.verdict,
+        "reason": item.reason,
+        "measured": any(
+            money.measured
+            for money in (item.cost_window, item.cost_per_session)
+            if money is not None
+        ),
+    }
+
+
+def _dollars(item: ArtifactStats, money: Money | None) -> float | None:
+    """Dollars, or ``None`` when unpriced or no session loaded the artifact."""
+    if money is None or item.loaded_sessions == 0:
+        return None
+    return money.value
+
+
+def _row_order(item: ArtifactStats) -> tuple[int, float, int, str]:
+    value = _dollars(item, item.cost_window)
+    priced = value is not None
+    return (0 if priced else 1, -(value or 0.0), -item.always_tokens, _label(item))
+
+
+def _ascii(text: str) -> str:
+    """``text`` with any non-ASCII character replaced by ``?``."""
+    return text.encode("ascii", "replace").decode("ascii")
+
+
+def _label(item: ArtifactStats) -> str:
+    artifact = item.artifact
+    if artifact.kind == "agents_md":
+        return _ascii(artifact.name)
+    return _ascii(f"{artifact.kind}:{artifact.name}")
+
+
+def _header(meta: ReportMeta) -> str:
+    versions = ", ".join(meta.claude_versions) or "unknown"
+    return (
+        f"context-audit  ({meta.session_count} sessions, "
+        f"{meta.first_day.isoformat()}..{meta.last_day.isoformat()}, "
+        f"Claude Code {_ascii(versions)})"
+    )
+
+
+def _untested(meta: ReportMeta) -> list[str]:
+    return [v for v in meta.claude_versions if v not in meta.tested_versions]
+
+
+def _warnings(meta: ReportMeta) -> list[str]:
+    lines: list[str] = []
+    untested = _untested(meta)
+    if untested:
+        lines.append(
+            f"Warning: Claude Code {_ascii(', '.join(untested))} not tested "
+            f"(tested: {', '.join(meta.tested_versions)}); the transcript format "
+            "may differ and figures may be wrong."
+        )
+    if meta.skipped_lines:
+        lines.append(
+            f"Skipped {meta.skipped_lines} transcript lines that did not parse."
+        )
+    return lines
+
+
+def _tokens(count: int) -> str:
+    return f"{count / 1000:.1f}k" if count >= 1000 else str(count)
+
+
+def _money(item: ArtifactStats, money: Money | None) -> str:
+    value = _dollars(item, money)
+    if value is None:
+        return NOT_AVAILABLE
+    # Small per-session figures would all round to 0.00 at two places.
+    return f"{value:.2f}" if value >= 0.01 or value == 0 else f"{value:.3f}"
+
+
+def _cells(item: ArtifactStats) -> list[str]:
+    always_on = item.artifact.kind in ALWAYS_ON_KINDS
+    loaded = item.loaded_sessions
+    return [
+        str(item.always_tokens),
+        EMPTY_CELL if always_on else str(item.on_use_tokens),
+        EMPTY_CELL if always_on or not loaded else f"{item.used_sessions}/{loaded}",
+        _money(item, item.cost_window),
+        _money(item, item.cost_per_session),
+        item.verdict,
+    ]
+
+
+def _table(shown: list[ArtifactStats]) -> list[str]:
+    rows = [(_label(item), _cells(item)) for item in shown]
+    name_width = max([len("artifact"), *(len(label) for label, _ in rows)])
+    widths = [
+        max(len(head), *(len(cells[i]) for _, cells in rows))
+        for i, head in enumerate(HEADERS)
+    ]
+
+    def line(label: str, cells: list[str]) -> str:
+        body = "  ".join(
+            cell.ljust(width) if i == len(cells) - 1 else cell.rjust(width)
+            for i, (cell, width) in enumerate(zip(cells, widths))
+        )
+        return f"{label.ljust(name_width)}  {body}".rstrip()
+
+    return [line("artifact", list(HEADERS)), *(line(*row) for row in rows)]
+
+
+def _reasons(shown: list[ArtifactStats]) -> list[str]:
+    return ["Why:", *(f"  {_label(item)}: {_ascii(item.reason)}" for item in shown)]
+
+
+def _not_ours(other: OtherLoad) -> str:
+    mark = "measured" if other.measured else "estimated"
+    return (
+        f"Not ours ({mark}), mean tokens per call: "
+        f"system prompt {_tokens(other.system_tokens)}, "
+        f"built-in tool defs {_tokens(other.builtin_tool_tokens)}, "
+        f"MCP/plugin {_tokens(other.mcp_tool_tokens)}"
+    )
+
+
+def _unmatched_lines(unmatched: list[Unmatched]) -> list[str]:
+    """Context recorded in sessions that no repo artifact accounts for."""
+    sizes: dict[str, list[int]] = defaultdict(list)
+    for item in unmatched:
+        sizes[item.source].append(item.chars)
+    if not sizes:
+        return []
+    ranked = sorted(sizes.items(), key=lambda pair: (-sum(pair[1]), pair[0]))
+    lines = ["Recorded but not in this repo (estimated, mean tokens per session):"]
+    for source, chars in ranked[:UNMATCHED_LINES]:
+        mean = tokens_from_chars(round(sum(chars) / len(chars)))
+        lines.append(f"  {_ascii(source)}: {_tokens(mean)} in {len(chars)} sessions")
+    return lines
+
+
+def _result_lines(results: list[ToolResultStat]) -> list[str]:
+    if not results:
+        return []
+    lines = ["", "Largest tool results (measured chars, estimated tokens):"]
+    for item in results:
+        lines.append(
+            f"  {_ascii(item.tool_name)}: {item.total_chars:,} chars "
+            f"(~{_tokens(tokens_from_chars(item.total_chars))} tokens) "
+            f"in {item.count} results, {item.repeated} repeated"
+        )
+    return lines
+
+
+def _footer() -> list[str]:
+    constants = (
+        f"MIN_SESSIONS = {MIN_SESSIONS}, "
+        f"TRIM_DESCRIPTION_TOKENS = {TRIM_DESCRIPTION_TOKENS}, "
+        f"LOW_USE_RATE = {LOW_USE_RATE}, "
+        f"TRIM_ALWAYS_ON_TOKENS = {TRIM_ALWAYS_ON_TOKENS}, "
+        f"CHARS_PER_TOKEN = {CHARS_PER_TOKEN}"
+    )
+    dollars = (
+        "$ columns are call-level dollar estimates (estimated): always-paid "
+        "tokens at each call's cache rates plus on-use body at the input rate; "
+        "n/a means an unpriced model or never loaded. Token columns are recorded "
+        f"sizes at {CHARS_PER_TOKEN} chars per token."
+    )
+    schemas = (
+        "Tool input schemas are excluded from the Not ours figures (the "
+        "transcript's request shape omits them), so tool tokens are understated."
+    )
+    return [dollars, f"Verdict rules (heuristic): {constants}", schemas]
