@@ -270,6 +270,5 @@ def test_footer_says_deferred_mcp_tools_are_understated() -> None:
     assert "MCP/plugin tokens are understated" in text
 
 
-def test_footer_is_ascii() -> None:
-    footer = render([make_stat()]).split("Verdict rules")[0]
-    assert footer.isascii()
+def test_report_with_new_footer_is_ascii() -> None:
+    assert render([make_stat()]).isascii()

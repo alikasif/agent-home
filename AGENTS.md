@@ -27,7 +27,7 @@ Plugin versions are not pinned. Last tested with `mattpocock-skills` 1.3.1; if a
 
 ## What lives here
 - `.claude/agents/`: specialist agents (orchestrator, PRD, design, planning, ralph, coders, reviewers, docs)
-- `.claude/skills/`: shared skills (model-router, pr-reviewer, token-budget, token-dashboard, secrets-detection, context-audit, context-trim). `context-audit` and `context-trim` measure and trim this repo's context cost; see the README.
+- `.claude/skills/`: shared skills (model-router, pr-reviewer, token-budget, token-dashboard, secrets-detection, context-audit, context-trim). `context-audit` and `context-trim` estimate and trim this repo's context cost; see the README.
 - `.claude/agent-memory/`: agent working-style memory shared across projects. Project-specific memory stays in the repo it is about.
 
 ## Other Repos (author's related projects, optional)
