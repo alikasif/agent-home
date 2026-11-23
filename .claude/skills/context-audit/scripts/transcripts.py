@@ -42,6 +42,32 @@ from typing import Any, Literal
 SYNTHETIC_MODEL = "<synthetic>"
 UNKNOWN_VERSION = "unknown"
 HASH_LENGTH = 16
+# Fewer unparseable lines than this in a file with no JSON object is treated as a
+# live session cut mid-write; more means the format changed.
+MIN_LINES_TO_REJECT = 2
+# Entry types Claude Code writes that this parser ignores. They count as
+# "recognised", so a session holding only these loads as an empty session.
+BOOKKEEPING_TYPES = frozenset(
+    {
+        "agent-name",
+        "ai-title",
+        "api-request-blob",
+        "atis-latch",
+        "custom-title",
+        "data-flow-records",
+        "derived-from",
+        "file-history-delta",
+        "file-history-snapshot",
+        "last-prompt",
+        "mode",
+        "permission-mode",
+        "pr-link",
+        "queue-operation",
+        "session-owner",
+        "system",
+        "tools-used",
+    }
+)
 COMMAND_NAME = re.compile(r"<command-name>/?([^<]*?)</command-name>")
 
 
@@ -187,7 +213,12 @@ def _transcript_paths(root: Path, project: str | None) -> Iterator[Path]:
 def _load_file(path: Path, since: date | None) -> Session | None:
     acc = _read_entries(path)
     if acc.parsed == 0:
-        return None  # empty, brand-new or only a truncated line: nothing to say
+        if acc.skipped < MIN_LINES_TO_REJECT:
+            return None  # empty, brand-new or only one truncated line
+        raise TranscriptFormatError(
+            f"{path.name}: {acc.skipped} lines and none is a JSON object "
+            f"(Claude Code version {acc.version or UNKNOWN_VERSION})"
+        )
     if acc.recognised == 0:
         raise TranscriptFormatError(
             f"{path.name}: no recognised transcript entries "
@@ -236,6 +267,7 @@ def _handle_line(acc: _Accumulator, line: str) -> None:
     entry_type = entry.get("type")
     handler = _HANDLERS.get(entry_type) if isinstance(entry_type, str) else None
     if handler is None:
+        acc.recognised += entry_type in BOOKKEEPING_TYPES
         return
     acc.recognised += 1
     if not handler(acc, entry):

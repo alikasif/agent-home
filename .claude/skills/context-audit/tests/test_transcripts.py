@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -230,19 +231,42 @@ def test_truncated_last_line_is_skipped(tmp_path: Path) -> None:
 
 
 def test_truncated_inside_a_multibyte_character_is_skipped(tmp_path: Path) -> None:
-    path = (
-        TranscriptBuilder()
-        .request()
-        .assistant()
-        .entry("user", message={"role": "user", "content": "café"})
-        .write(tmp_path / "p" / "s.jsonl")
-    )
-    path.write_bytes(path.read_bytes().rstrip(b"\n")[:-3])
+    path = TranscriptBuilder().request().assistant().write(tmp_path / "p" / "s.jsonl")
+    last = {"type": "user", "message": {"role": "user", "content": "café"}}
+    line = json.dumps(last, ensure_ascii=False).encode("utf-8")
+    cut = line.index("é".encode()) + 1  # keep only the first byte of e-acute
+    path.write_bytes(path.read_bytes() + line[:cut])
+    assert path.read_bytes().endswith(b"\xc3")  # a dangling UTF-8 lead byte
 
     session = load_one(tmp_path)
 
     assert len(session.calls) == 1
     assert session.skipped_lines == 1
+
+
+def test_file_of_non_json_lines_raises(tmp_path: Path) -> None:
+    (tmp_path / "p").mkdir()
+    (tmp_path / "p" / "s.jsonl").write_bytes(b"not json\n[1, 2]\n42\nmore text\n")
+
+    with pytest.raises(TranscriptFormatError, match="none is a JSON object"):
+        list(load_sessions(tmp_path))
+
+
+def test_metadata_only_session_loads_empty(tmp_path: Path) -> None:
+    (
+        TranscriptBuilder(version="2.1.330")
+        .entry("last-prompt")
+        .entry("mode", mode="normal")
+        .entry("permission-mode", permissionMode="default")
+        .entry("session-owner")
+        .write(tmp_path / "p" / "s.jsonl")
+    )
+
+    session = load_one(tmp_path)
+
+    assert session.calls == []
+    assert session.version == "2.1.330"
+    assert session.skipped_lines == 0
 
 
 def test_project_and_since_filters(tmp_path: Path) -> None:
