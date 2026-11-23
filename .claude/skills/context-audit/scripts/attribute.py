@@ -22,7 +22,8 @@ from typing import Literal
 
 from transcripts import Session
 
-# Used only to split measured totals across files; see ``calibrate_ratio``.
+# Turns recorded characters into estimated tokens. ``calibrate_ratio`` runs low
+# (it cannot see tool schemas or user messages), so this fixed ratio is used.
 CHARS_PER_TOKEN = 4.0
 FRONTMATTER_FENCE = "---"
 AGENTS_MD = "AGENTS.md"
@@ -105,7 +106,8 @@ def scan_repo(root: Path) -> list[Artifact]:
 
 
 def _read(path: Path) -> str:
-    return path.read_text(encoding="utf-8", errors="replace")
+    # utf-8-sig: a byte order mark would otherwise hide the frontmatter fence.
+    return path.read_text(encoding="utf-8-sig", errors="replace")
 
 
 def _whole_file(kind: Kind, name: str, path: Path) -> Artifact:

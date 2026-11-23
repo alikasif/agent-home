@@ -31,7 +31,8 @@ def write(path: Path, text: str) -> Path:
 def make_repo(root: Path) -> Path:
     write(
         root / ".claude/agents/alpha-agent.md",
-        '---\nname: "alpha-agent"\ndescription: "Short."\nmodel: sonnet\n---\n\nBody.\n',
+        '---\nname: "alpha-agent"\ndescription: "Short."\nmodel: sonnet\n'
+        "---\n\nBody.\n",
     )
     write(
         root / ".claude/skills/alpha-skill/SKILL.md",
@@ -104,6 +105,26 @@ def test_frontmatter_name_overrides_file_stem(tmp_path: Path) -> None:
     )
     (agent,) = scan_repo(tmp_path)
     assert agent.name == "real-name"
+
+
+def test_utf8_bom_does_not_hide_frontmatter(tmp_path: Path) -> None:
+    path = tmp_path / ".claude/agents/file-stem.md"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"\xef\xbb\xbf---\nname: real-name\ndescription: abcd\n---\nbody")
+    (agent,) = scan_repo(tmp_path)
+    assert (agent.name, agent.description_chars, agent.body_chars) == (
+        "real-name",
+        4,
+        4,
+    )
+
+
+def test_bom_is_not_counted_in_whole_file_size(tmp_path: Path) -> None:
+    path = tmp_path / "rules" / "beta.md"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"\xef\xbb\xbfrule")
+    (rule,) = scan_repo(tmp_path)
+    assert rule.body_chars == 4
 
 
 def test_agent_without_name_uses_file_stem(tmp_path: Path) -> None:
