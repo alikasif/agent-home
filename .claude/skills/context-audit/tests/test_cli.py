@@ -149,11 +149,11 @@ def test_report_survives_cp1252_stdout(
     raw = io.BytesIO()
     wrapper = io.TextIOWrapper(raw, encoding="cp1252", errors="strict")
     monkeypatch.setattr(sys, "stdout", wrapper)
-    for flags in ([], ["--json"]):
+    for flags in ([], ["--details"], ["--json"]):
         code = main(["--repo", str(repo), "--root", str(root), *flags])
         assert code == 0
     wrapper.flush()
-    assert b"context-audit" in raw.getvalue()
+    assert b"Context audit" in raw.getvalue()
 
 
 def test_report_works_when_stdout_cannot_reconfigure(
@@ -175,10 +175,10 @@ def test_project_filter_and_since(
     write_session(root, "other", "s3", "2026-11-20T10:00:00+00:00")
 
     _, out, _ = run(capsys, tmp_path, "--root", str(root))
-    assert "(3 sessions," in out
+    assert "3 sessions," in out
 
     _, out, _ = run(capsys, tmp_path, "--root", str(root), "--project", "agent-home")
-    assert "(2 sessions," in out
+    assert "2 sessions," in out
 
     _, out, _ = run(
         capsys,
@@ -190,7 +190,7 @@ def test_project_filter_and_since(
         "--since",
         "2026-11-05",
     )
-    assert "(1 sessions," in out
+    assert "1 session," in out
 
 
 def test_header_dates_come_from_call_timestamps(
@@ -200,7 +200,7 @@ def test_header_dates_come_from_call_timestamps(
     write_session(root, "p", "s1", "2026-11-03T10:00:00+00:00")
     write_session(root, "p", "s2", "2026-11-09T10:00:00+00:00")
     _, out, _ = run(capsys, tmp_path, "--root", str(root))
-    assert "2026-11-03..2026-11-09" in out
+    assert "2026-11-03 to 2026-11-09" in out
     _, out, _ = run(capsys, tmp_path, "--root", str(root), "--json")
     meta = json.loads(out)["meta"]
     assert (meta["first_day"], meta["last_day"]) == ("2026-11-03", "2026-11-09")
@@ -228,8 +228,53 @@ def test_top_limits_report_rows(
 ) -> None:
     root = tmp_path / "projects"
     write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
-    _, out, _ = run(capsys, tmp_path, "--root", str(root), "--top", "1")
+    _, out, _ = run(capsys, tmp_path, "--root", str(root), "--top", "1", "--details")
     assert "(showing top 1 of 2 artifacts by $)" in out
+
+
+def test_default_output_is_the_compact_table(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
+    code, out, _ = run(capsys, tmp_path, "--root", str(root))
+    assert code == 0
+    assert "| Name | Tokens every session | Used in | Est. cost | What to do |" in out
+    assert "| alpha |" in out
+    assert "Why:" not in out
+    assert "Verdict rules" not in out
+    assert "--details" in out
+
+
+def test_details_flag_prints_the_full_report(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
+    code, out, _ = run(capsys, tmp_path, "--root", str(root), "--details")
+    assert code == 0
+    assert "Why:" in out
+    assert "Verdict rules" in out
+    assert "| Name |" not in out
+
+
+def test_top_applies_to_the_compact_table(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
+    _, out, _ = run(capsys, tmp_path, "--root", str(root), "--top", "1")
+    assert "1 more rows not shown (--top N or --details)" in out
+
+
+def test_json_ignores_details(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
+    _, plain, _ = run(capsys, tmp_path, "--root", str(root), "--json")
+    _, detailed, _ = run(capsys, tmp_path, "--root", str(root), "--json", "--details")
+    assert json.loads(plain) == json.loads(detailed)
 
 
 def test_bad_since_is_a_usage_error(

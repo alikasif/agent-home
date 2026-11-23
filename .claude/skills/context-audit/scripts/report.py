@@ -431,6 +431,106 @@ def render_report(
     return "\n".join(lines) + "\n"
 
 
+SUMMARY_ROWS = 15
+SUMMARY_HEADERS = ("Name", "Tokens every session", "Used in", "Est. cost", "What to do")
+SUMMARY_ALIGN = ("---", "---:", "---:", "---:", "---")
+ACTIONS: dict[Verdict, str] = {
+    "trim": "Shorten description",
+    "move-to-on-demand": "Consider loading only on demand",
+    "keep": "Fine",
+    "insufficient data": "Not enough data",
+}
+
+
+def render_summary(
+    stats: list[ArtifactStats],
+    other: OtherLoad,
+    results: list[ToolResultStat],
+    meta: ReportMeta,
+    top: int | None,
+) -> str:
+    """Return the compact default view: one plain-language table and two notes.
+
+    Rows are ordered like :func:`render_report` and cut to ``top`` (default
+    ``SUMMARY_ROWS``). Reasons, thresholds and caveats are left to
+    :func:`render_report` (``--details``). ASCII only; names, sizes and counts
+    only, never message, attachment or file content.
+    """
+    ranked = sorted(stats, key=_row_order)
+    shown = ranked[: SUMMARY_ROWS if top is None else max(top, 0)]
+    lines = [_summary_header(meta), *_warnings(meta), "", *_summary_table(shown)]
+    if len(shown) < len(ranked):
+        lines.append(
+            f"{len(ranked) - len(shown)} more rows not shown (--top N or --details)"
+        )
+    lines += ["", *_summary_notes(other, results)]
+    return "\n".join(lines) + "\n"
+
+
+def _summary_header(meta: ReportMeta) -> str:
+    noun = "session" if meta.session_count == 1 else "sessions"
+    return (
+        f"Context audit: {meta.session_count} {noun}, "
+        f"{meta.first_day.isoformat()} to {meta.last_day.isoformat()}"
+    )
+
+
+def _summary_table(shown: list[ArtifactStats]) -> list[str]:
+    def line(cells: tuple[str, ...] | list[str]) -> str:
+        return "| " + " | ".join(cells) + " |"
+
+    rows = [line(_summary_cells(item)) for item in shown]
+    return [line(SUMMARY_HEADERS), "|" + "|".join(SUMMARY_ALIGN) + "|", *rows]
+
+
+def _summary_cells(item: ArtifactStats) -> list[str]:
+    loaded = item.loaded_sessions
+    if not loaded:
+        used = EMPTY_CELL
+    elif item.artifact.kind in ALWAYS_ON_KINDS:
+        used = "always on"
+    else:
+        used = f"{item.used_sessions} of {loaded}"
+    cost = _money(item, item.cost_window)
+    return [
+        _ascii(item.artifact.name).replace("|", "/"),
+        str(item.always_tokens),
+        used,
+        cost if cost == NOT_AVAILABLE else f"${cost}",
+        _action(item),
+    ]
+
+
+def _action(item: ArtifactStats) -> str:
+    if item.verdict == "insufficient data" and not item.loaded_sessions:
+        return "Not loaded in these sessions"
+    if item.verdict == "trim" and item.artifact.kind in ALWAYS_ON_KINDS:
+        return "Shorten the file"
+    return ACTIONS[item.verdict]
+
+
+def _summary_notes(other: OtherLoad, results: list[ToolResultStat]) -> list[str]:
+    lines = [
+        (
+            "Not counted above: built-in tools about "
+            f"{_tokens(other.builtin_tool_tokens)} tokens per call, system prompt "
+            f"about {_tokens(other.system_tokens)}."
+        )
+    ]
+    if results:
+        top = results[0]
+        tokens = _tokens(tokens_from_chars(top.total_chars))
+        lines.append(
+            f"Largest tool output: {_ascii(top.tool_name)}, about {tokens} tokens "
+            f"in {top.count} results."
+        )
+    lines.append(
+        "All figures are estimates, not billing, and dollars run low. "
+        "Use --details for the reasons and caveats."
+    )
+    return lines
+
+
 def render_json(stats: list[ArtifactStats], meta: ReportMeta) -> str:
     """Return the report as JSON: ``{"meta": {...}, "artifacts": [...]}``.
 

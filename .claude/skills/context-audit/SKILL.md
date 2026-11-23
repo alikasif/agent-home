@@ -19,25 +19,29 @@ trimming.
 Claude Code records, per session, which agent and skill listings and which
 instruction files (`AGENTS.md`, rules) it loaded, plus per-call token usage.
 `audit.py` reads those transcripts (read-only), matches the recorded blocks to
-this repo's files by name, and reports for each file:
+this repo's files by name, and prints one plain table, costliest first:
 
-- `always`: tokens paid by every session that loads it
-- `on-use`: tokens paid each time an agent or skill is actually invoked
-- `used`: invoked in `a` of the `b` sessions that loaded it
-- `$ window` and `$/session`: estimated dollars over the scanned window and per
-  loaded session
-- `verdict`: `keep`, `trim`, `move-to-on-demand` or `insufficient data`, with
-  the reason listed under `Why:`
+| Column | Meaning |
+|---|---|
+| Name | the agent, skill, rule or `AGENTS.md` |
+| Tokens every session | what every session that loads it pays |
+| Used in | invoked in `a` of the `b` sessions that loaded it |
+| Est. cost | estimated dollars over the scanned window |
+| What to do | `Shorten description`, `Consider loading only on demand`, `Fine`, or `Not enough data` |
 
-Below the table it shows context that is not this repo's (system prompt, built-in
-and MCP tools, other skills and agents), the largest tool results, and the
-verdict thresholds. Always-on files (`AGENTS.md`, rules) only get `keep` or
-`trim`.
+Under the table are two plain notes: what is not counted (built-in tools and the
+system prompt) and the largest tool output. `--details` prints the full report
+instead: on-use tokens, per-session dollars, the verdict names with the reason
+for each, thresholds and every caveat. Always-on files (`AGENTS.md`, rules) only
+get `Fine` or `Shorten the file`.
 
 ## Running the audit
 
 Run `audit.py` from the repo root and echo its stdout **verbatim**; do not
-paraphrase or summarise the output.
+paraphrase or summarise the output. The default output is already the short
+table, so do not add a second table or restate the rows. After it, add at most
+two sentences: the one or two rows that matter most, and that figures are
+estimates. Offer `--details` for the reasons; do not run it unasked.
 
 ```
 uv run --no-dev python "<skill_dir>/scripts/audit.py"
@@ -55,7 +59,9 @@ Flags (all optional):
 - `--project NAME`: only project directories under `~/.claude/projects` whose
   name contains `NAME` (case-insensitive), for example `--project agent-home`
 - `--since YYYY-MM-DD`: only sessions that started on or after that UTC date
-- `--top N`: show only the `N` costliest artifacts in the table
+- `--top N`: show only the `N` costliest artifacts in the table (default 15)
+- `--details`: print the full report (reasons, thresholds, caveats) instead of
+  the compact table
 - `--json`: print JSON instead of the report, for `/context-trim`. The shape is
   `{"meta": {...}, "artifacts": [...]}`; read the list from `data["artifacts"]`.
   Artifact `path` values are relative to the repo with forward slashes. `--top`
@@ -84,8 +90,8 @@ not report it as a transcript format change.
   run inside a subagent (read from the session's subagent transcripts). On-use
   dollars cover the dispatch only, not the calls the subagent makes, so they are
   understated for agents that run long.
-- The `MCP/plugin` figure in `Not ours` is understated (it can read about 1):
-  deferred MCP tools are not in the recorded request shape.
+- In `--details`, the `MCP/plugin` figure in `Not ours` is understated (it can
+  read about 1): deferred MCP tools are not in the recorded request shape.
 - A `Warning:` line means a session came from a Claude Code version the parser
   was not tested against; say so when summarising.
 - Files are matched to transcripts by name or path suffix. If other projects
@@ -96,10 +102,11 @@ not report it as a transcript format change.
 - Agents and skills only load in sessions started in this repo, so a
   repo-wide scan understates them relative to sessions in other projects.
 - `AGENTS.md` in this repo is not auto-loaded: `CLAUDE.md` only points to it and
-  Claude reads it on demand, so it normally reports `insufficient data`. In a
-  fork whose `CLAUDE.md` imports it, it is matched like any other file.
-- `insufficient data` means fewer than `MIN_SESSIONS` loaded sessions; it is not
-  a verdict.
+  Claude reads it on demand, so it normally shows `Not loaded in these
+  sessions` (`insufficient data` in `--details`). In a fork whose `CLAUDE.md`
+  imports it, it is matched like any other file.
+- `Not enough data` (`insufficient data` in `--details`) means fewer than
+  `MIN_SESSIONS` loaded sessions; it is not a verdict.
 
 ## Privacy
 
@@ -114,7 +121,7 @@ files.
 
 - **User**: "What is eating my context?"
   - Run `audit.py`, paste the output, then point to the largest rows and the
-    `Not ours` line
+    `Not counted above` line
 
 - **User**: "Audit only this repo's sessions since last week"
   - Run `audit.py --project agent-home --since YYYY-MM-DD` with the real date

@@ -1,8 +1,9 @@
 """Command line entry point for ``/context-audit``.
 
 Reads Claude Code transcripts, matches what they recorded as loaded against this
-repo's agents, skills, rules and ``AGENTS.md``, and prints a cost report (or JSON
-for ``/context-trim``). Only names, sizes and counts are printed.
+repo's agents, skills, rules and ``AGENTS.md``, and prints a compact table (the
+full report with ``--details``, or JSON for ``/context-trim``). Only names, sizes
+and counts are printed.
 
 Run as ``uv run --no-dev python .claude/skills/context-audit/scripts/audit.py``;
 the sibling modules are imported by bare name, so this directory must be the
@@ -27,6 +28,7 @@ from report import (
     other_load,
     render_json,
     render_report,
+    render_summary,
     top_tool_results,
 )
 from transcripts import (
@@ -83,7 +85,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         print(render_json(stats, meta))
     else:
-        text = render_report(
+        render = render_report if args.details else render_summary
+        text = render(
             stats,
             other_load(sessions),
             top_tool_results(sessions, TOOL_RESULT_ROWS),
@@ -114,9 +117,15 @@ def _parser() -> argparse.ArgumentParser:
         "--top", metavar="N", type=int, help="show only the N costliest artifacts"
     )
     parser.add_argument(
+        "--details",
+        action="store_true",
+        help="print the full report (reasons, thresholds, caveats) instead of "
+        "the compact table",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
-        help="print JSON (all artifacts) instead of the terminal report",
+        help="print JSON (all artifacts) instead of the table; ignores --details",
     )
     parser.add_argument(
         "--root",
