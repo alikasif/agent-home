@@ -4,9 +4,9 @@ Reads Claude Code transcripts, matches what they recorded as loaded against this
 repo's agents, skills, rules and ``AGENTS.md``, and prints a cost report (or JSON
 for ``/context-trim``). Only names, sizes and counts are printed.
 
-Run as ``uv run python .claude/skills/context-audit/scripts/audit.py``; the sibling
-modules are imported by bare name, so this directory must be the script's own
-directory (it is, when run this way).
+Run as ``uv run --no-dev python .claude/skills/context-audit/scripts/audit.py``;
+the sibling modules are imported by bare name, so this directory must be the
+script's own directory (it is, when run this way).
 """
 
 from __future__ import annotations

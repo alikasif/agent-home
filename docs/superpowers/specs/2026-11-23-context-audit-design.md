@@ -1,6 +1,6 @@
 # Context Audit: design
 
-Status: DRAFT, awaiting approval. Nothing is built yet.
+Status: APPROVED and implemented on branch feat/context-audit.
 Inspired by: ContextSpy (https://github.com/RimantasZ/contextspy), a proxy-based context profiler. This design is deliberately different: no proxy, and it attributes cost to the files in this repo.
 
 ## Intent and why

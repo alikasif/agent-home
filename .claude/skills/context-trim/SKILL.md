@@ -35,7 +35,7 @@ this repo costs in context.
 1. Run the audit from the repo root and read the JSON:
 
    ```
-   uv run python "<context-audit skill_dir>/scripts/audit.py" --json
+   uv run --no-dev python "<context-audit skill_dir>/scripts/audit.py" --json
    ```
 
    Replace `<context-audit skill_dir>` with the absolute path to the
@@ -53,20 +53,34 @@ this repo costs in context.
    pass `--project NAME`, where NAME is this repo's folder name under
    `~/.claude/projects`, before proposing trims (see "Reading the result
    honestly" in the `context-audit` skill).
-   Exit code `2` means an unrecognised transcript format: relay stderr and stop.
-   If the output says "No sessions found", relay that and stop.
+   The token and dollar figures are estimated from recorded sizes at 4.0 chars
+   per token and list prices; not derived from billing totals.
+   Exit code `2` with `unrecognised transcript format` on stderr means a
+   transcript format this tool does not know: relay stderr and stop. Any other
+   exit `2` is a usage error (for example a mistyped `--since`): fix the command
+   and do not report it as a format change.
+   If no sessions were found, the JSON has an empty `artifacts` list and the
+   reason in `meta.message`: relay that message and stop.
 
 2. Select entries whose `verdict` is `trim` or `move-to-on-demand`. Tell the user
    the list (artifact, kind, `always_tokens`, `reason`), and which entries you
    skipped as `insufficient data`.
 
 3. Work through the selected entries one at a time. For each: read the file at
-   `path`, then propose ONE concrete edit as a diff. Prefer edits that keep the
+   `path`, then propose ONE concrete edit as a diff. Edit only the repo file at
+   `path`, never an installed copy under `~/.claude`. Prefer edits that keep the
    behaviour and cut the words, for example:
-   - shorten or drop `<example>` blocks inside an agent `description`, keeping
-     the trigger conditions that tell Claude when to use it
+   - shorten an agent `description`. What must survive: the leading "Use this
+     agent when..." conditions, the distinguishing nouns that separate it from
+     neighbouring agents (its inputs, its role, who dispatches it), and at least
+     one `<example>` with its `<commentary>`. Cut the number of examples and the
+     example prose first; never cut the "use when" conditions.
    - shorten a long skill `description` to the sentence that says when to use it
    - tighten repeated or explanatory prose in a rule or `AGENTS.md`
+
+   Rules in `rules/` are installed to `~/.claude/rules` by
+   `scripts/install-rules.ps1`. A trimmed rule saves nothing until the user
+   re-runs that script; say so when proposing a rule edit.
 
    For an agent or skill, the always-paid cost is its frontmatter `description`
    plus the name; the body is paid only when it is invoked. For a `rule` or
@@ -83,8 +97,9 @@ this repo costs in context.
    that loads only when needed") and do not apply it. If a text trim of the same
    file is also useful, propose that as a normal edit.
 
-6. After the session of edits, re-run `audit.py --json` and report the result as
-   described below. If nothing was applied, say so and skip this step.
+6. When you have finished the edits, report the estimated before and after for
+   each applied edit, as described below. If nothing was applied, say so. A
+   re-run of `audit.py --json` is optional and will not reflect the edits.
 
 ## Estimating the saving
 
@@ -105,8 +120,9 @@ current file size. So:
   for agents and skills, the whole file for rules and `AGENTS.md`), divide the
   difference by `CHARS_PER_TOKEN = 4.0`, and label it `(estimated)`. Report the
   before `always_tokens` from the first audit and the estimated after
-  (`always_tokens` minus the estimated saving). Say that the re-run audit still
-  reflects past sessions, and that new sessions will show the real change.
+  (`always_tokens` minus the estimated saving). Say that new sessions will show
+  the real change, and, if you re-ran the audit, that it still reflects past
+  sessions.
 
 ## Privacy
 

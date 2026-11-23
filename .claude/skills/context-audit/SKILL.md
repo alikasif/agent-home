@@ -40,8 +40,11 @@ Run `audit.py` from the repo root and echo its stdout **verbatim**; do not
 paraphrase or summarise the output.
 
 ```
-uv run python "<skill_dir>/scripts/audit.py"
+uv run --no-dev python "<skill_dir>/scripts/audit.py"
 ```
+
+`--no-dev` keeps the first run from installing the repo's dev tools (pytest,
+ruff, pyrefly); the script needs only the standard library.
 
 Replace `<skill_dir>` with the absolute path to this skill directory (the folder
 containing this `SKILL.md`). From the agent-home repo root that is
@@ -61,16 +64,28 @@ Flags (all optional):
 - `--repo PATH`: repo to audit (default: current directory)
 
 Exit code `0` is success, including "No sessions found" (relay that message and
-suggest loosening `--project` or `--since`). Exit code `2` means a transcript is
-in a format this tool does not recognise; stderr names the Claude Code version.
-Relay it and stop: do not guess at figures.
+suggest loosening `--project` or `--since`). Exit code `2` with
+`unrecognised transcript format` on stderr means a transcript is in a format
+this tool does not recognise; stderr names the Claude Code version. Relay it and
+stop: do not guess at figures. Any other exit `2` is a usage error from the
+argument parser, for example a mistyped `--since` date: fix the command and do
+not report it as a transcript format change.
 
 ## Reading the result honestly
 
-- Figures marked `(estimated)` are splits of measured totals: recorded
-  characters divided by `CHARS_PER_TOKEN = 4.0`, and call-level dollar
-  estimates from the per-model rates in `pricing.py`. They rank files and size
-  them; they are not billing numbers.
+- Figures marked `(estimated)` are estimated from recorded sizes at 4.0 chars
+  per token and list prices; not derived from billing totals. Tokens are
+  recorded characters divided by `CHARS_PER_TOKEN = 4.0`; dollars apply the
+  per-model rates in `pricing.py` call by call. They rank files and size them;
+  they are not billing numbers.
+- Dollar figures assume the cache stays warm; cache misses are not counted, so
+  they are understated.
+- `used` counts invocations anywhere in a session, including agents and skills
+  run inside a subagent (read from the session's subagent transcripts). On-use
+  dollars cover the dispatch only, not the calls the subagent makes, so they are
+  understated for agents that run long.
+- The `MCP/plugin` figure in `Not ours` is understated (it can read about 1):
+  deferred MCP tools are not in the recorded request shape.
 - A `Warning:` line means a session came from a Claude Code version the parser
   was not tested against; say so when summarising.
 - Files are matched to transcripts by name or path suffix. If other projects
@@ -80,8 +95,9 @@ Relay it and stop: do not guess at figures.
   the scan to this repo's sessions when that matters.
 - Agents and skills only load in sessions started in this repo, so a
   repo-wide scan understates them relative to sessions in other projects.
-- `AGENTS.md` here is not auto-loaded (`CLAUDE.md` only points to it), so it
-  normally reports `insufficient data`.
+- `AGENTS.md` in this repo is not auto-loaded: `CLAUDE.md` only points to it and
+  Claude reads it on demand, so it normally reports `insufficient data`. In a
+  fork whose `CLAUDE.md` imports it, it is matched like any other file.
 - `insufficient data` means fewer than `MIN_SESSIONS` loaded sessions; it is not
   a verdict.
 
