@@ -258,3 +258,21 @@ def test_agent_dispatched_inside_a_subagent_counts_as_used(
     assert code == 0
     assert data["meta"]["session_count"] == 1
     assert (row["loaded_sessions"], row["used_sessions"]) == (1, 1)
+
+
+def test_calls_without_parseable_timestamps_are_a_format_error(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    path = standard_session().write(root / "p" / "s.jsonl")
+    entries = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
+    for entry in entries:
+        entry["timestamp"] = "not-a-time"
+    path.write_text("".join(json.dumps(e) + "\n" for e in entries), "utf-8")
+    for flag in ([], ["--json"]):
+        code, out, err = run(capsys, tmp_path, "--root", str(root), *flag)
+        assert code == 2
+        assert out == ""
+        assert "unrecognised transcript format" in err
+        assert "2.1.330" in err
+        assert "No sessions found" not in err

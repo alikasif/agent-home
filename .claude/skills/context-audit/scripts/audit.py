@@ -46,7 +46,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the audit and return the process exit code.
 
     ``0`` for a report or for "no sessions found"; ``2`` when a transcript is in
-    a format this tool does not recognise (nothing is printed to stdout then).
+    a format this tool does not recognise, including sessions with API calls of
+    which none has a readable timestamp. Then stderr says "unrecognised
+    transcript format" and nothing is printed to stdout, in JSON mode too.
+    (argparse also exits ``2`` on a usage error, with its own message.)
     """
     _use_utf8(sys.stdout)
     _use_utf8(sys.stderr)
@@ -62,6 +65,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # the used-in-a-of-b counts.
     sessions = [session for session in loaded if session.calls]
     days = _call_days(sessions)
+    if days is None and sessions:
+        versions = ", ".join(sorted({session.version for session in sessions}))
+        print(
+            "context-audit: unrecognised transcript format: no API call has a "
+            f"timestamp this tool can read (Claude Code version {versions})",
+            file=sys.stderr,
+        )
+        return EXIT_FORMAT_ERROR
     if days is None:
         print(_no_sessions(args, json_mode=args.json))
         return EXIT_OK

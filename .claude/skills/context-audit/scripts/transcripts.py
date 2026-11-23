@@ -306,7 +306,10 @@ def _handle_line(acc: _Accumulator, line: str) -> None:
     entry_type = entry.get("type")
     handler = _HANDLERS.get(entry_type) if isinstance(entry_type, str) else None
     if handler is None:
-        acc.recognised += entry_type in BOOKKEEPING_TYPES
+        # A list or dict ``type`` is unhashable and simply not recognised.
+        acc.recognised += int(
+            isinstance(entry_type, str) and entry_type in BOOKKEEPING_TYPES
+        )
         return
     acc.recognised += 1
     if not handler(acc, entry):

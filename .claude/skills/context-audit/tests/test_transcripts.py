@@ -469,3 +469,21 @@ def test_subagent_meta_json_files_are_not_read(tmp_path: Path) -> None:
     meta.write_text('{"agentType": "synthetic"}\n', encoding="utf-8")
 
     assert len(load_one(tmp_path).invocations) == 2
+
+
+def test_unhashable_entry_type_counts_as_unrecognised(tmp_path: Path) -> None:
+    path = write_standard(tmp_path)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write('{"type": ["x"]}\n{"type": {"k": 1}}\n{}\n')
+
+    assert len(load_one(tmp_path).calls) == 3
+
+
+def test_file_of_only_unhashable_types_still_raises(tmp_path: Path) -> None:
+    (tmp_path / "p").mkdir()
+    (tmp_path / "p" / "s.jsonl").write_text(
+        '{"type": ["x"]}\n{"type": {"k": 1}}\n', encoding="utf-8"
+    )
+
+    with pytest.raises(TranscriptFormatError, match="no recognised"):
+        list(load_sessions(tmp_path))
