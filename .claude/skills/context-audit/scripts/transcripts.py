@@ -23,6 +23,9 @@ Differences between the documented format and real transcripts (Claude Code
 * ``tool_result.content`` is a string or a list of ``text``/``tool_reference``
   blocks.
 * ``cost-state`` is absent from many files; the last one in a file wins.
+* A subagent's transcript is a separate file,
+  ``<project>/<session>/subagents/agent-*.jsonl`` (next to an
+  ``agent-*.meta.json``), in the same format. Only its invocations are used.
 
 Only names, sizes and counts are meant to leave this module's callers; the text
 fields on the records exist so later stages can match them against repo files.
@@ -197,6 +200,13 @@ def load_sessions(
 ) -> Iterator[Session]:
     """Yield sessions under ``root/<project>/<session>.jsonl``.
 
+    The invocations (Skill and Agent tool uses, slash commands) recorded in the
+    session's subagent transcripts, ``<project>/<session>/subagents/*.jsonl``,
+    are added to its ``invocations``, so an agent dispatched by another agent
+    counts as used. Their calls, shapes and attachments are not added: the
+    attachment indexes point into the parent's own ``calls``. Subagent files of
+    a session that is absent or filtered out are not read.
+
     ``project`` keeps project directories whose name contains it (case
     insensitive). ``since`` keeps sessions whose first timestamp falls on or
     after that UTC date. A missing ``root`` yields nothing. Raises
@@ -219,21 +229,15 @@ def _transcript_paths(root: Path, project: str | None) -> Iterator[Path]:
 
 
 def _load_file(path: Path, since: date | None) -> Session | None:
-    acc = _read_entries(path)
-    if acc.parsed == 0:
-        if acc.skipped < MIN_LINES_TO_REJECT:
-            return None  # empty, brand-new or only one truncated line
-        raise TranscriptFormatError(
-            f"{path.name}: {acc.skipped} lines and none is a JSON object "
-            f"(Claude Code version {acc.version or UNKNOWN_VERSION})"
-        )
-    if acc.recognised == 0:
-        raise TranscriptFormatError(
-            f"{path.name}: no recognised transcript entries "
-            f"(Claude Code version {acc.version or UNKNOWN_VERSION})"
-        )
+    acc = _read_checked(path)
+    if acc is None:
+        return None
     if since is not None and not _started_on_or_after(acc.first_timestamp, since):
         return None
+    for subagent in _subagent_paths(path):
+        sub = _read_checked(subagent)
+        if sub is not None:
+            acc.invocations.extend(sub.invocations)
     return Session(
         session_id=path.stem,
         project=path.parent.name,
@@ -249,6 +253,33 @@ def _load_file(path: Path, since: date | None) -> Session | None:
         cost_usd=acc.cost_usd,
         skipped_lines=acc.skipped,
     )
+
+
+def _subagent_paths(main: Path) -> list[Path]:
+    """Subagent transcripts of the session at ``main``, in name order."""
+    return sorted((main.parent / main.stem / "subagents").glob("*.jsonl"))
+
+
+def _read_checked(path: Path) -> _Accumulator | None:
+    """Parse ``path``; ``None`` when it holds nothing yet.
+
+    Raises :class:`TranscriptFormatError` when it has entries but none of a
+    recognised type, or is mostly lines that are not JSON objects.
+    """
+    acc = _read_entries(path)
+    if acc.parsed == 0:
+        if acc.skipped < MIN_LINES_TO_REJECT:
+            return None  # empty, brand-new or only one truncated line
+        raise TranscriptFormatError(
+            f"{path.name}: {acc.skipped} lines and none is a JSON object "
+            f"(Claude Code version {acc.version or UNKNOWN_VERSION})"
+        )
+    if acc.recognised == 0:
+        raise TranscriptFormatError(
+            f"{path.name}: no recognised transcript entries "
+            f"(Claude Code version {acc.version or UNKNOWN_VERSION})"
+        )
+    return acc
 
 
 def _read_entries(path: Path) -> _Accumulator:

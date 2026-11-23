@@ -245,6 +245,15 @@ class TranscriptBuilder:
         return path
 
 
+def subagent_path(main: Path, agent_id: str = "agent-x") -> Path:
+    """Where Claude Code writes a subagent transcript of the session at ``main``.
+
+    ``<project>/<session>.jsonl`` keeps its subagents in
+    ``<project>/<session>/subagents/<agent_id>.jsonl``.
+    """
+    return main.parent / main.stem / "subagents" / f"{agent_id}.jsonl"
+
+
 def standard_session(
     session_id: str = "sess-1", start: str = DEFAULT_START
 ) -> TranscriptBuilder:

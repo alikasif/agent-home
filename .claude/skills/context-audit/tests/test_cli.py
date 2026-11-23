@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from audit import main
-from transcript_factory import TranscriptBuilder, standard_session
+from transcript_factory import TranscriptBuilder, standard_session, subagent_path
 
 
 def make_repo(tmp_path: Path, agent_name: str = "alpha") -> Path:
@@ -238,3 +238,23 @@ def test_bad_since_is_a_usage_error(
     with pytest.raises(SystemExit) as raised:
         run(capsys, tmp_path, "--since", "yesterday")
     assert raised.value.code == 2
+
+
+def test_agent_dispatched_inside_a_subagent_counts_as_used(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    root = tmp_path / "projects"
+    write_session(root, "p", "s1", "2026-11-01T10:00:00+00:00")
+    (
+        TranscriptBuilder(session_id="s1")
+        .request()
+        .assistant()
+        .tool_use("Agent", {"subagent_type": "alpha", "prompt": "synthetic"})
+        .write(subagent_path(root / "p" / "s1.jsonl"))
+    )
+    code, out, _ = run(capsys, tmp_path, "--root", str(root), "--json")
+    data = json.loads(out)
+    row = next(item for item in data["artifacts"] if item["artifact"] == "alpha")
+    assert code == 0
+    assert data["meta"]["session_count"] == 1
+    assert (row["loaded_sessions"], row["used_sessions"]) == (1, 1)

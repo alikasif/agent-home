@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from transcript_factory import TranscriptBuilder, standard_session
+from transcript_factory import TranscriptBuilder, standard_session, subagent_path
 from transcripts import (
     TESTED_VERSIONS,
     Call,
@@ -347,3 +347,125 @@ def test_tested_versions_is_a_non_empty_tuple_of_strings() -> None:
     assert TESTED_VERSIONS
     assert isinstance(TESTED_VERSIONS, tuple)
     assert all(isinstance(version, str) for version in TESTED_VERSIONS)
+
+
+# -- subagent transcripts -----------------------------------------------------
+
+
+def write_subagent(main: Path, agent: str = "nested-agent") -> Path:
+    return (
+        TranscriptBuilder(session_id="sub-session")
+        .shape("shape-sub")
+        .request("shape-sub")
+        .assistant(input=99, output=9)
+        .tool_use("Agent", {"subagent_type": agent, "prompt": "synthetic"})
+        .tool_use("Skill", {"skill": "sub-skill"})
+        .write(subagent_path(main))
+    )
+
+
+def test_subagent_invocations_fold_into_parent_session(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    write_subagent(main)
+
+    session = load_one(tmp_path)
+
+    assert session.session_id == "sess-1"
+    assert session.invocations == [
+        Invocation("skill", "x", "tool"),
+        Invocation("skill", "y", "slash"),
+        Invocation("agent", "nested-agent", "tool"),
+        Invocation("skill", "sub-skill", "tool"),
+    ]
+
+
+def test_subagent_calls_shapes_and_attachments_are_not_folded(
+    tmp_path: Path,
+) -> None:
+    main = write_standard(tmp_path)
+    (
+        TranscriptBuilder()
+        .shape("shape-sub")
+        .instructions({"/r/AGENTS.md": "synthetic"})
+        .request("shape-sub")
+        .assistant(input=99)
+        .tool_result("synthetic sub result")
+        .cost_state(9.0)
+        .write(subagent_path(main))
+    )
+
+    session = load_one(tmp_path)
+
+    assert len(session.calls) == 3
+    assert set(session.shapes) == {"shape-a"}
+    assert len(session.instructions) == 1
+    assert len(session.tool_results) == 1
+    assert session.cost_usd == 1.25
+
+
+def test_every_subagent_file_of_a_session_is_folded(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    for agent_id, agent in (("agent-a", "first"), ("agent-b", "second")):
+        (
+            TranscriptBuilder()
+            .request()
+            .assistant()
+            .tool_use("Agent", {"subagent_type": agent})
+            .write(subagent_path(main, agent_id))
+        )
+
+    names = [call.name for call in load_one(tmp_path).invocations]
+
+    assert names == ["x", "y", "first", "second"]
+
+
+def test_orphan_subagent_directory_is_ignored(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    orphan = main.parent / "missing-session.jsonl"
+    bad = subagent_path(orphan)
+    bad.parent.mkdir(parents=True)
+    bad.write_text('{"type": "brand-new-type"}\n', encoding="utf-8")
+
+    assert load_one(tmp_path).session_id == "sess-1"
+
+
+def test_subagents_of_a_session_filtered_by_since_are_ignored(
+    tmp_path: Path,
+) -> None:
+    main = write_standard(tmp_path, start="2026-10-01T00:00:00+00:00")
+    bad = subagent_path(main)
+    bad.parent.mkdir(parents=True)
+    bad.write_text('{"type": "brand-new-type"}\n', encoding="utf-8")
+
+    assert list(load_sessions(tmp_path, since=date(2026, 11, 1))) == []
+
+
+def test_bad_format_subagent_file_raises(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    (
+        TranscriptBuilder(version="9.9.9")
+        .entry("brand-new-type")
+        .entry("another-new-type")
+        .write(subagent_path(main))
+    )
+
+    with pytest.raises(TranscriptFormatError, match=r"agent-x\.jsonl.*9\.9\.9"):
+        list(load_sessions(tmp_path))
+
+
+def test_empty_or_metadata_only_subagent_file_is_fine(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    TranscriptBuilder().entry("agent-name").write(subagent_path(main, "agent-meta"))
+    empty = subagent_path(main, "agent-empty")
+    empty.write_bytes(b"")
+
+    assert len(load_one(tmp_path).invocations) == 2
+
+
+def test_subagent_meta_json_files_are_not_read(tmp_path: Path) -> None:
+    main = write_standard(tmp_path)
+    meta = subagent_path(main).with_suffix(".meta.json")
+    meta.parent.mkdir(parents=True)
+    meta.write_text('{"agentType": "synthetic"}\n', encoding="utf-8")
+
+    assert len(load_one(tmp_path).invocations) == 2
