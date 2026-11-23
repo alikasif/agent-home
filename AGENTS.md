@@ -27,7 +27,7 @@ Plugin versions are not pinned. Last tested with `mattpocock-skills` 1.3.1; if a
 
 ## What lives here
 - `.claude/agents/`: specialist agents (orchestrator, PRD, design, planning, ralph, coders, reviewers, docs)
-- `.claude/skills/`: shared skills (model-router, pr-reviewer, token-budget, token-dashboard, secrets-detection)
+- `.claude/skills/`: shared skills (model-router, pr-reviewer, token-budget, token-dashboard, secrets-detection, context-audit, context-trim). `context-audit` and `context-trim` read the session transcripts in `~/.claude/projects` (read-only) and need no hooks. The transcript format is not a stable API; they are tested against Claude Code 2.1.201, 2.1.325, 2.1.326 and 2.1.330 (`TESTED_VERSIONS` in `.claude/skills/context-audit/scripts/transcripts.py`)
 - `.claude/agent-memory/`: agent working-style memory shared across projects. Project-specific memory stays in the repo it is about.
 
 ## Other Repos (author's related projects, optional)

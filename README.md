@@ -9,7 +9,7 @@ This repo is an implementation of the **Home Repo pattern** described by Matt Po
 | Path | Contents |
 |---|---|
 | `.claude/agents/` | Specialist agents: orchestrator, product requirements, design, planning, execution (`ralph`), Python coder, test runner, reviewers, docs writer |
-| `.claude/skills/` | `model-router`, `pr-reviewer`, `token-budget`, `token-dashboard`, `secrets-detection` |
+| `.claude/skills/` | `model-router`, `pr-reviewer`, `token-budget`, `token-dashboard`, `secrets-detection`, `context-audit`, `context-trim` |
 | `.claude/agent-memory/` | Working-style memory shared by the agents |
 | `.claude/settings.json` | Enables the `superpowers` and `mattpocock-skills` plugins and pre-allows the `pr-reviewer` commands |
 | `rules/` | Global rules, installed to `~/.claude/rules` |
@@ -39,6 +39,7 @@ This repo is an implementation of the **Home Repo pattern** described by Matt Po
 
 - `/pr-reviewer <handle[/repo]>`, usually as `/loop 5m /pr-reviewer <handle>`: reviews open PRs once per head SHA.
 - `/token-budget` and `/token-dashboard`: set a token budget and view usage history. These rely on hooks that are **not** included in this repo (a `Stop` hook that records usage to `~/.claude/token_usage.db`, and a hook that injects budget status). Wire them up in your `~/.claude/settings.json` using the scripts in each skill's `scripts/` folder, or the skills will have no data.
+- `/context-audit` and `/context-trim`: show which agents, skills, rules and `AGENTS.md` cost the most context and give each a keep, trim or move-to-on-demand verdict, then propose trims one edit at a time (nothing is applied without your approval). They read the session transcripts in `~/.claude/projects` (read-only) and need no hooks, unlike `/token-budget` and `/token-dashboard`. The transcript format is not a stable API: they are tested against Claude Code 2.1.201, 2.1.325, 2.1.326 and 2.1.330 (`TESTED_VERSIONS` in `.claude/skills/context-audit/scripts/transcripts.py`), and warn on other versions.
 - `/secrets-detection`: scan for leaked credentials.
 - `/model-router`: pick the right model for planning, coding or delegating.
 
