@@ -62,7 +62,22 @@ Shared development guidelines for all repos. Follow these guidelines precisely.
 - **Build Test Environments**: Create testing environments for components that are difficult to validate directly
 - **Functional Code**: Use functional and stateless approaches where they improve clarity
 - **Clean logic**: Keep core logic clean and push implementation details to the edges
-- **File Organsiation**: Balance file organization with simplicity - use an appropriate number of files for the project scale
+- **File Organisation**: See "Project Structure" below. Group by responsibility; stay flat only for tiny projects.
+
+## Project Structure
+
+Apply this whenever you propose a layout in a design or plan, and whenever you create code. Show the directory tree before listing any task or file. If the tree fails a rule below, regroup it before presenting.
+
+- **Group by responsibility.** No directory holds more than about 5 modules or mixes responsibilities. Split it into subpackages.
+- **Name for what it does.** `client/`, `sandbox/`, `billing/`. Never `utils/`, `helpers/`, `common/` or `misc/` as a dumping ground.
+- **src layout.** Entry points (`cli.py`, `main.py`) sit at the package top level and hold no logic.
+- **Tests mirror the source tree.** `src/pkg/sandbox/runtime.py` is tested in `tests/sandbox/test_runtime.py`.
+- **Every package has `__init__.py`.** Use absolute imports (`from pkg.sandbox.runtime import Runtime`).
+- **One-way dependencies.** State which package may import which, with no cycles, in the spec or plan. Only the entry point may import everything.
+- **One folder per variant.** Servers, providers and adapters each get a folder under a registry package, so adding one changes no core code.
+- **Tiny projects may stay flat.** A few modules with one responsibility do not need subpackages.
+
+Example (the MCP code-execution benchmark): `client/`, `codegen/`, `sandbox/`, `llm/`, `agents/`, `bench/`, `targets/<server>/`, plus `cli.py`.
 
 
 
