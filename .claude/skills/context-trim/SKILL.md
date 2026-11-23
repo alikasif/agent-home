@@ -47,6 +47,12 @@ this repo costs in context.
    `used_sessions`, `cost_window`, `cost_per_session`, `verdict` (`keep`, `trim`,
    `move-to-on-demand` or `insufficient data`), `reason` and `measured`.
    `--project NAME` and `--since YYYY-MM-DD` are accepted as in `/context-audit`.
+   Other projects' same-named files (`AGENTS.md`, `rules/<name>.md`) are counted
+   as this repo's, which can inflate `loaded_sessions` past `MIN_SESSIONS` and
+   produce a `trim` verdict from other projects' data. When that could matter,
+   pass `--project NAME`, where NAME is this repo's folder name under
+   `~/.claude/projects`, before proposing trims (see "Reading the result
+   honestly" in the `context-audit` skill).
    Exit code `2` means an unrecognised transcript format: relay stderr and stop.
    If the output says "No sessions found", relay that and stop.
 
