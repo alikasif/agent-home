@@ -1,0 +1,15 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "mattpocock-skills@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run python .claude/skills/pr-reviewer/scripts/check_prs.py:*)",
+      "Bash(uv run python .claude/skills/pr-reviewer/scripts/post_review.py:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh repo list:*)"
+    ]
+  }
+}

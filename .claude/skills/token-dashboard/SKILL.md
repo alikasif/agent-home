@@ -32,17 +32,13 @@ and writes one row per task into `~/.claude/token_usage.db` (SQLite).
 Run `dashboard.py` and echo its stdout **verbatim** — do not paraphrase or
 summarise the output.
 
-**Windows:**
-```
-uv run python "D:/GitHub/agent-foundry/.claude/skills/token-dashboard/scripts/dashboard.py"
-```
-
-**Linux/macOS:**
 ```
 uv run python "<skill_dir>/scripts/dashboard.py"
 ```
 
-Replace `<skill_dir>` with the absolute path to this skill directory.
+Replace `<skill_dir>` with the absolute path to this skill directory (the folder
+containing this `SKILL.md`). From the agent-home repo root that is
+`.claude/skills/token-dashboard`.
 
 ## Examples
 
