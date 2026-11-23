@@ -222,3 +222,20 @@ def test_unmatched_and_skipped_lines_reported() -> None:
 def test_small_dollar_figures_keep_three_places() -> None:
     line = row(render([make_stat("tiny", window=0.036)]), "agent:tiny")
     assert "0.04" in line and "0.003" in line
+
+
+def test_no_rows_renders_without_crashing() -> None:
+    for text in (
+        render([]),
+        render([make_stat()], top=0),
+        render([make_stat()], top=-3),
+    ):
+        assert "artifact" in text
+        assert "Why:" not in text
+        assert "Not ours" in text
+
+
+def test_token_columns_are_labelled_estimated_not_recorded() -> None:
+    text = render([make_stat()])
+    assert "Token columns are estimated sizes (recorded chars / 4.0)" in text
+    assert "recorded sizes" not in text

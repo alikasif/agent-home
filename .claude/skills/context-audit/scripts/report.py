@@ -418,7 +418,9 @@ def render_report(
     lines += _table(shown)
     if len(shown) < len(ranked):
         lines.append(f"(showing top {len(shown)} of {len(ranked)} artifacts by $)")
-    lines += ["", *_reasons(shown), ""]
+    if shown:
+        lines += ["", *_reasons(shown)]
+    lines.append("")
     lines.append(_not_ours(other))
     lines += _unmatched_lines(meta.unmatched)
     lines += _result_lines(results)
@@ -557,7 +559,7 @@ def _table(shown: list[ArtifactStats]) -> list[str]:
     rows = [(_label(item), _cells(item)) for item in shown]
     name_width = max([len("artifact"), *(len(label) for label, _ in rows)])
     widths = [
-        max(len(head), *(len(cells[i]) for _, cells in rows))
+        max([len(head), *(len(cells[i]) for _, cells in rows)])
         for i, head in enumerate(HEADERS)
     ]
 
@@ -624,8 +626,8 @@ def _footer() -> list[str]:
     dollars = (
         "$ columns are call-level dollar estimates (estimated): always-paid "
         "tokens at each call's cache rates plus on-use body at the input rate; "
-        "n/a means an unpriced model or never loaded. Token columns are recorded "
-        f"sizes at {CHARS_PER_TOKEN} chars per token."
+        "n/a means an unpriced model or never loaded. Token columns are "
+        f"estimated sizes (recorded chars / {CHARS_PER_TOKEN})."
     )
     schemas = (
         "Tool input schemas are excluded from the Not ours figures (the "
