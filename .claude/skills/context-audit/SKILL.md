@@ -40,7 +40,7 @@ get `Fine` or `Shorten the file`.
 Run `audit.py` from the repo root and echo its stdout **verbatim**; do not
 paraphrase or summarise the output. The default output is already the short
 table, so do not add a second table or restate the rows. After it, add at most
-two sentences: the one or two rows that matter most, and that figures are
+two bullets: the one or two rows that matter most, and that figures are
 estimates. Offer `--details` for the reasons; do not run it unasked.
 
 ```
@@ -113,6 +113,14 @@ not report it as a transcript format change.
 The report contains names, sizes and counts only. It never prints message text,
 attachment text or file content, and it does not modify transcripts or repo
 files.
+
+## Reporting style
+
+Applies to messages to the user. Not to verbatim script output, files you write or text this skill requires exactly.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
 
 ## Examples
 

@@ -48,3 +48,11 @@ Named agents in `.claude/agents/` carry their own `model:` line. Use the agent a
 ## Cost note
 
 If the main session itself runs on Opus, every inline step pays Opus rates. Run the main session on Sonnet and let this skill delegate the reasoning to Opus.
+
+## Reporting style
+
+Applies to messages to the user. Not to verbatim script output, files you write or text this skill requires exactly.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.

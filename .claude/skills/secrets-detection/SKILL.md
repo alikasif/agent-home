@@ -81,3 +81,11 @@ api_key = os.environ["API_KEY"]
 - If a secret has been committed, advise the user to rotate it even after removal (it's in git history)
 - Include `detect-secrets` or `gitleaks` pre-commit hook setup as prevention
 - False positives should be documented but marked clearly as such
+
+## Reporting style
+
+Applies to messages to the user. Not to verbatim script output, files you write or text this skill requires exactly.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.

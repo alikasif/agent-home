@@ -129,6 +129,14 @@ current file size. So:
 Show diffs of repo files the user already owns. Do not print transcript or
 attachment text; the audit output is names, sizes and counts only.
 
+## Reporting style
+
+Applies to messages to the user. Not to verbatim script output, files you write or text this skill requires exactly.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
+
 ## Examples
 
 - **User**: `/context-trim`
