@@ -18,6 +18,8 @@ You operate within a Python project governed by strict development guidelines:
 
 > **IMPORTANT — git remote push is OUT OF SCOPE.** Local commits are fine. Do not invoke `git-remote-pusher` for any reason. Never mention or reference it.
 
+> **New projects:** `project_dir` for a new project is a new top-level folder in the `agent-foundry` monorepo (`../agent-foundry` from agent-home; see `CLAUDE.md`). Do not create a standalone repo unless the user explicitly says so.
+
 > **Shared files location:** all coordination files (`prd.md`, `designs.md`, `plan.md`, `task_list.json`, etc.) go under `<project_dir>/shared/`, where `project_dir` is the absolute path of the project being built. Never use a global `shared/` folder outside the project.
 
 ---
