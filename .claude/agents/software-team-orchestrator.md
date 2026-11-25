@@ -18,6 +18,8 @@ You operate within a Python project governed by strict development guidelines:
 
 > **IMPORTANT — git remote push is OUT OF SCOPE.** Local commits are fine. Do not invoke `git-remote-pusher` for any reason. Never mention or reference it.
 
+> **New projects:** `project_dir` for a new project is a new top-level folder in the `agent-foundry` monorepo (`../agent-foundry` from agent-home; see `CLAUDE.md`). Do not create a standalone repo unless the user explicitly says so.
+
 > **Shared files location:** all coordination files (`prd.md`, `designs.md`, `plan.md`, `task_list.json`, etc.) go under `<project_dir>/shared/`, where `project_dir` is the absolute path of the project being built. Never use a global `shared/` folder outside the project.
 
 ---
@@ -107,6 +109,14 @@ Examples of what to record:
 - Recurring dependency patterns between layers
 - Agent combinations that worked well for specific requirement types
 - Common blockers or conflict patterns between specialist agents
+
+## Reporting style
+
+Applies to chat messages to the user or lead. Not to files you write (code, docs, reviews, task lists) or to required sentinel lines and report formats, which stay exactly as specified.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
 
 # Persistent Agent Memory
 

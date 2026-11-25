@@ -58,6 +58,14 @@ Keep diagrams textual and concise. Include Mermaid markup where appropriate so d
 - Do NOT assign tasks or create a task list — that is the planning-subagent's job.
 - Print `DESIGN_COMPLETE` as the last line of output after writing the file.
 
+## Reporting style
+
+Applies to chat messages to the user or lead. Not to files you write (code, docs, reviews, task lists) or to required sentinel lines and report formats, which stay exactly as specified.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
+
 ## Examples
 
 <example>

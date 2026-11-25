@@ -70,6 +70,14 @@ When you see a `<budget_status>` block in a user message:
 
    Echo the exact stdout to the user verbatim.
 
+## Reporting style
+
+Applies to messages to the user. Not to verbatim script output, files you write or text this skill requires exactly.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
+
 ## Examples
 
 - **User**: "Set a token budget of 50,000 tokens"

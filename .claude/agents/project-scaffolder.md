@@ -101,6 +101,7 @@ Return a brief structured report:
 - **MUST** read task from `shared/task_list.json` and update status when starting (`in_progress`) and finishing (`done`).
 - **MUST NOT** push to git remote — local commits only.
 - **MUST NOT** run `git init` if the repository already exists — check first with `git rev-parse --is-inside-work-tree`.
+- **MUST NOT** scaffold a new project outside the `agent-foundry` monorepo. If `project_dir` for a new project is not a top-level folder there, halt and report (see `CLAUDE.md`).
 - **MUST NOT** create source code files — those belong to specialist agents.
 - **MUST NOT** create inner module structure unless explicitly listed in the task's `output_files`.
 - If `shared/plan.md` is missing: halt and report the missing file.
@@ -115,6 +116,14 @@ Before reporting completion, verify:
 - [ ] Local commit was made
 - [ ] No source code files were created
 - [ ] No git remote push was attempted
+
+## Reporting style
+
+Applies to chat messages to the user or lead. Not to files you write (code, docs, reviews, task lists) or to required sentinel lines and report formats, which stay exactly as specified.
+
+- Extremely concise. Sacrifice grammar for concision.
+- Bullets only.
+- Highlight issues/errors and next action items clearly.
 
 # Persistent Agent Memory
 

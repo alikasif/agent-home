@@ -57,5 +57,7 @@ Notes
 - **`git-remote-pusher` is excluded from all operations.** Never invoke it. Never mention it. Local commits are the only git operations allowed.
 - All coordination files (`prd.md`, `designs.md`, `plan.md`, `task_list.json`, `learnings.md`, `execution_summary.md`, `reviews/`) live under `<project_dir>/shared/` — always project-local, never in a global directory.
 - Agent definitions are stored in `.claude/agents/` as markdown files with YAML frontmatter.
+- Every agent body has a `## Reporting style` section (copy of the one in `CLAUDE.md`); keep it when editing an agent.
+- New projects are created as a new top-level folder in `agent-foundry` (see `CLAUDE.md`), never as a standalone repo.
 - Model routing rule lives in `.claude/skills/model-router/SKILL.md`; keep each agent's `model:` line consistent with it.
 - If you add or change agents, update `.claude/agents/<agent>.md` and this section in `CLAUDE.md`.
